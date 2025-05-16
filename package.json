@@ -233,6 +233,16 @@
 				"command": "kilo-code.acceptInput",
 				"title": "%command.acceptInput.title%",
 				"category": "%configuration.title%"
+			},
+			{
+				"command": "kilo-code.acceptGhostText",
+				"title": "Accept Ghost Text Suggestion",
+				"category": "Kilo Code"
+			},
+			{
+				"command": "kilo-code.dismissGhostText",
+				"title": "Dismiss Ghost Text Suggestion",
+				"category": "Kilo Code"
 			}
 		],
 		"keybindings": [
@@ -247,6 +257,18 @@
 				"key": "ctrl+shift+k",
 				"mac": "cmd+shift+k",
 				"when": "true"
+			},
+			{
+				"command": "kilo-code.acceptGhostText",
+				"key": "tab",
+				"mac": "tab",
+				"when": "editorTextFocus && kilo-code.ghostTextVisible"
+			},
+			{
+				"command": "kilo-code.dismissGhostText",
+				"key": "escape",
+				"mac": "escape",
+				"when": "editorTextFocus && kilo-code.ghostTextVisible"
 			}
 		],
 		"menus": {
