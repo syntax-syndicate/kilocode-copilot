@@ -929,6 +929,14 @@ export const webviewMessageHandler = async (provider: ClineProvider, message: We
 			await updateGlobalState("enhancementApiConfigId", message.text)
 			await provider.postStateToWebview()
 			break
+		case "autocompleteApiConfigId":
+			console.log("webviewMessageHandler: Received autocompleteApiConfigId message", {
+				configId: message.text,
+			})
+			await updateGlobalState("autocompleteApiConfigId", message.text)
+			await provider.postStateToWebview()
+			console.log("webviewMessageHandler: Updated autocompleteApiConfigId in global state")
+			break
 		case "autoApprovalEnabled":
 			await updateGlobalState("autoApprovalEnabled", message.bool ?? false)
 			await provider.postStateToWebview()

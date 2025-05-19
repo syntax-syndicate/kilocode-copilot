@@ -172,6 +172,7 @@ type GlobalSettings = {
 		  }
 		| undefined
 	enhancementApiConfigId?: string | undefined
+	autocompleteApiConfigId?: string | undefined
 	historyPreviewCollapsed?: boolean | undefined
 }
 

@@ -102,8 +102,19 @@ export class API extends EventEmitter<RooCodeEvents> implements RooCodeAPI {
 	}) {
 		let provider: ClineProvider
 
+		let neato = false
+
+		if (neato) {
+			await vscode.commands.executeCommand("workbench.action.files.revert")
+			await vscode.commands.executeCommand("workbench.action.closeAllEditors")
+			provider = await openClineInNewTab({ context: this.context, outputChannel: this.outputChannel })
+			this.registerListeners(provider)
+		} else {
+		}
+
 		if (newTab) {
 			await vscode.commands.executeCommand("workbench.action.files.revert")
+
 			await vscode.commands.executeCommand("workbench.action.closeAllEditors")
 
 			provider = await openClineInNewTab({ context: this.context, outputChannel: this.outputChannel })

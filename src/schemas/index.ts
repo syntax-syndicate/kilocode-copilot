@@ -753,6 +753,7 @@ export const globalSettingsSchema = z.object({
 	customModePrompts: customModePromptsSchema.optional(),
 	customSupportPrompts: customSupportPromptsSchema.optional(),
 	enhancementApiConfigId: z.string().optional(),
+	autocompleteApiConfigId: z.string().optional(),
 	historyPreviewCollapsed: z.boolean().optional(),
 })
 
@@ -832,6 +833,7 @@ const globalSettingsRecord: GlobalSettingsRecord = {
 	customModePrompts: undefined,
 	customSupportPrompts: undefined,
 	enhancementApiConfigId: undefined,
+	autocompleteApiConfigId: undefined,
 	cachedChromeHostUrl: undefined,
 	historyPreviewCollapsed: undefined,
 }

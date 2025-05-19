@@ -180,6 +180,7 @@ export type ExtensionState = Pick<
 	| "customModePrompts"
 	| "customSupportPrompts"
 	| "enhancementApiConfigId"
+	| "autocompleteApiConfigId"
 > & {
 	version: string
 	clineMessages: ClineMessage[]
