@@ -11,6 +11,29 @@ export function registerAutocomplete(context: vscode.ExtensionContext) {
 	// Add configuration for autocomplete
 	const config = vscode.workspace.getConfiguration()
 
+	// Create and register the autocomplete provider
+	const autocompleteProvider = new AutocompleteProvider()
+	const disposable = autocompleteProvider.register(context)
+
+	// Initialize the ghost text visibility context to false
+	vscode.commands.executeCommand("setContext", "kilo-code.ghostTextVisible", false)
+
+	// Subscribe to the event in the AutocompleteProvider
+	context.subscriptions.push({
+		dispose: () => {
+			// Clean up the provider when extension is deactivated
+			if (disposable) {
+				disposable.dispose()
+			}
+
+			// Reset the context when disposing
+			vscode.commands.executeCommand("setContext", "kilo-code.ghostTextVisible", false)
+
+			// Dispose the autocomplete provider
+			autocompleteProvider.dispose()
+		},
+	})
+
 	// Ensure the configuration exists
 	if (!config.has("kilo-code.autocomplete.enabled")) {
 		config.update("kilo-code.autocomplete.enabled", true, vscode.ConfigurationTarget.Global)
@@ -51,37 +74,6 @@ export function registerAutocomplete(context: vscode.ExtensionContext) {
 	if (!config.has("kilo-code.autocomplete.providerName")) {
 		config.update("kilo-code.autocomplete.providerName", "ollama", vscode.ConfigurationTarget.Global)
 	}
-
-	// Create and register the autocomplete provider
-	const autocompleteProvider = new AutocompleteProvider()
-	const disposable = autocompleteProvider.register(context)
-
-	// Set up context tracking for ghost text visibility
-	vscode.commands.executeCommand("setContext", "kilo-code.ghostTextVisible", false)
-
-	// Add event listener for ghost text visibility changes
-	const updateGhostTextVisibility = (isVisible: boolean) => {
-		vscode.commands.executeCommand("setContext", "kilo-code.ghostTextVisible", isVisible)
-	}
-
-	// Subscribe to the event in the AutocompleteProvider
-	context.subscriptions.push({
-		dispose: () => {
-			// Clean up the provider when extension is deactivated
-			if (disposable) {
-				disposable.dispose()
-			}
-
-			// Reset the context when disposing
-			vscode.commands.executeCommand("setContext", "kilo-code.ghostTextVisible", false)
-
-			// Dispose the autocomplete provider
-			autocompleteProvider.dispose()
-		},
-	})
-
-	// Expose the updateGhostTextVisibility function to the AutocompleteProvider
-	;(autocompleteProvider as any).updateGhostTextVisibility = updateGhostTextVisibility
 
 	// Log that autocomplete has been registered
 	console.log("Kilo Code autocomplete provider registered")
