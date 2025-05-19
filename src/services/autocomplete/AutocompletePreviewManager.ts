@@ -15,7 +15,6 @@ export class AutocompletePreviewManager {
 	// Throttling properties
 	private throttleTimeout: NodeJS.Timeout | null = null
 	private throttleDelay: number = 75 // 75ms is a good balance between responsiveness and performance
-	private accumulatedText: string = ""
 	private pendingEditor: vscode.TextEditor | null = null
 
 	constructor() {
@@ -75,31 +74,14 @@ export class AutocompletePreviewManager {
 	 * Throttled method to update ghost text
 	 * Accumulates text chunks and only updates the UI every throttleDelay ms
 	 * @param editor The active text editor
-	 * @param text The text chunk to accumulate
+	 * @param textRaw The text chunk to accumulate
 	 */
-	public throttledUpdateGhostText(editor: vscode.TextEditor, text: string) {
-		// Store the editor reference
+	public throttledUpdateGhostText(editor: vscode.TextEditor, textRaw: string) {
+		const text = this.cleanMarkdownCodeBlocks(textRaw)
+
 		this.pendingEditor = editor
 
-		// Accumulate the text
-		this.accumulatedText += text
-
-		// If there's no active throttle timeout, create one
-		if (!this.throttleTimeout) {
-			this.throttleTimeout = setTimeout(() => {
-				// Only update if we have an editor and accumulated text
-				if (this.pendingEditor && this.accumulatedText) {
-					// Update with the accumulated text
-					this.updateGhostText(this.pendingEditor, this.accumulatedText)
-
-					// Reset accumulated text
-					this.accumulatedText = ""
-				}
-
-				// Clear the timeout
-				this.throttleTimeout = null
-			}, this.throttleDelay)
-		}
+		this.updateGhostText(this.pendingEditor, text)
 	}
 
 	/**

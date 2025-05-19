@@ -108,6 +108,8 @@ export class AutocompleteProvider {
 						clearTimeout(this.debounceTimeout)
 					}
 
+					const editor = vscode.window.activeTextEditor
+
 					this.debounceTimeout = setTimeout(async () => {
 						try {
 							// Initialize API handler if needed
@@ -184,6 +186,7 @@ export class AutocompleteProvider {
 
 							// Initialize an empty completion
 							latestCompletion = ""
+
 							// Create the stream using the API handler's createMessage method
 							const stream = this.apiHandler.createMessage(systemPrompt, [
 								{ role: "user", content: [{ type: "text", text: prompt }] },
@@ -191,42 +194,28 @@ export class AutocompleteProvider {
 
 							// Process the stream
 							for await (const chunk of stream) {
-								// Check for cancellation before processing each chunk
 								if (checkCancellation()) {
 									break
 								}
 
-								// Process text chunks
 								if (chunk.type === "text") {
-									// Clean markdown code blocks from the chunk text
-									// const cleanedText = this.cleanMarkdownCodeBlocks(chunk.text)
-									// const cleanedText = this.cleanMarkdownCodeBlocks(chunk.text)
-
-									// Append the cleaned chunk text to the completion
 									latestCompletion += chunk.text
 
 									// Update the ghost text as chunks arrive (using throttled updates)
-									const editor = vscode.window.activeTextEditor
 									if (editor && editor.document === document) {
-										const cleanedText = this.previewManager.cleanMarkdownCodeBlocks(chunk.text)
-										// Use the throttled update method instead of direct update
-										this.previewManager.throttledUpdateGhostText(editor, cleanedText)
+										this.previewManager.throttledUpdateGhostText(editor, latestCompletion)
 									}
 								}
 							}
 
-							const finalCompletion = this.previewManager.cleanMarkdownCodeBlocks(latestCompletion)
-
-							// If cancelled, don't proceed with the completion
 							if (isCancelled) {
 								return
 							}
 
-							const selectedCompletionInfo = context.selectedCompletionInfo
-
 							// This code checks if there is a selected completion suggestion in the given context and ensures that it is valid
 							// To improve the accuracy of suggestions it checks if the user has typed at least 4 characters
 							// This helps refine and filter out irrelevant autocomplete options
+							const selectedCompletionInfo = context.selectedCompletionInfo
 							if (selectedCompletionInfo) {
 								const { text, range } = selectedCompletionInfo
 								const typedText = document.getText(range)
@@ -238,10 +227,9 @@ export class AutocompleteProvider {
 							}
 
 							// Cache the completion
+							const finalCompletion = this.previewManager.cleanMarkdownCodeBlocks(latestCompletion)
 							this.cache.set(document.uri.toString(), document.getText(), cursorIndex, finalCompletion)
 
-							// Update the ghost text using our decoration approach
-							const editor = vscode.window.activeTextEditor
 							if (editor && editor.document === document) {
 								this.previewManager.updateGhostText(editor, finalCompletion)
 							}
