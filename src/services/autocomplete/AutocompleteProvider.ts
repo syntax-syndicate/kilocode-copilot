@@ -337,18 +337,22 @@ export class AutocompleteProvider {
 										// Process text chunks
 										if (chunk.type === "text") {
 											// Clean markdown code blocks from the chunk text
-											const cleanedText = this.cleanMarkdownCodeBlocks(chunk.text)
+											// const cleanedText = this.cleanMarkdownCodeBlocks(chunk.text)
+											// const cleanedText = this.cleanMarkdownCodeBlocks(chunk.text)
 
 											// Append the cleaned chunk text to the completion
-											latestCompletion += cleanedText
+											latestCompletion += chunk.text
 
 											// Update the ghost text as chunks arrive
 											const editor = vscode.window.activeTextEditor
 											if (editor && editor.document === document) {
-												this.updateGhostText(editor, latestCompletion)
+												const cleanedText = this.cleanMarkdownCodeBlocks(chunk.text)
+												this.updateGhostText(editor, cleanedText)
 											}
 										}
 									}
+
+									const finalCompletion = this.cleanMarkdownCodeBlocks(latestCompletion)
 
 									// If cancelled, don't proceed with the completion
 									if (isCancelled) {
@@ -358,10 +362,10 @@ export class AutocompleteProvider {
 									}
 
 									console.log("AutocompleteProvider: Completed streaming:", {
-										completionLength: latestCompletion.length,
+										completionLength: finalCompletion.length,
 										completion:
-											latestCompletion.substring(0, 100) +
-											(latestCompletion.length > 100 ? "..." : ""),
+											finalCompletion.substring(0, 100) +
+											(finalCompletion.length > 100 ? "..." : ""),
 									})
 
 									const selectedCompletionInfo = context.selectedCompletionInfo
@@ -388,14 +392,14 @@ export class AutocompleteProvider {
 										document.uri.toString(),
 										document.getText(),
 										cursorIndex,
-										latestCompletion,
+										finalCompletion,
 									)
 
 									// Update the ghost text using our decoration approach
 									const editor = vscode.window.activeTextEditor
-									console.log("🚀 ~ AutocompleteProvider ~ latestCompletion:", latestCompletion)
+									console.log("🚀 ~ AutocompleteProvider ~ finalCompletion:", finalCompletion)
 									if (editor && editor.document === document) {
-										this.updateGhostText(editor, latestCompletion)
+										this.updateGhostText(editor, finalCompletion)
 									}
 
 									// Return null since we're handling the display ourselves with decorations
