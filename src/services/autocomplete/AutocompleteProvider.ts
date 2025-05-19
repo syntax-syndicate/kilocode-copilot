@@ -6,7 +6,6 @@ import { ProviderSettings } from "../../shared/api"
 import { CompletionCache } from "./CompletionCache"
 import { ContextGatherer } from "./ContextGatherer"
 import { PromptRenderer } from "./PromptRenderer"
-import { ContextProxy } from "../../core/config/ContextProxy"
 
 /**
  * Provider for autocomplete functionality
@@ -99,6 +98,7 @@ export class AutocompleteProvider {
 	register(context: vscode.ExtensionContext) {
 		// Debug: Check if API handler initializes correctly
 		console.log("🔍 AutocompleteProvider: Starting register method, initializing API handler...")
+		this.initializeApiHandler()
 
 		// Register configuration for autocomplete
 		context.subscriptions.push(
@@ -203,7 +203,6 @@ export class AutocompleteProvider {
 						this.debounceTimeout = setTimeout(async () => {
 							try {
 								// Initialize API handler if needed
-								// Initialize API handler if needed
 								this.apiHandler = await this.initializeApiHandler()
 
 								if (!this.apiHandler) {
@@ -267,14 +266,9 @@ export class AutocompleteProvider {
 									if (this.activeCompletionId === completionId) {
 										this.activeCompletionId = null
 									}
-
-									// No need to cancel completion in streamer
 								})
 
-								// Stream the completion
 								let latestCompletion = ""
-
-								// No need for streamer safety check
 
 								// Stream the completion from the API
 								const request = {
@@ -375,7 +369,6 @@ export class AutocompleteProvider {
 									if (selectedCompletionInfo) {
 										const { text, range } = selectedCompletionInfo
 										const typedText = document.getText(range)
-
 										const typedLength = range.end.character - range.start.character
 
 										if (typedLength < 4) {
@@ -471,118 +464,87 @@ export class AutocompleteProvider {
 		if (this.apiHandler) {
 			return this.apiHandler
 		}
+
 		try {
-			const { config: conf } = await this.config.loadConfig()
-
-			if (!conf?.selectedModelByRole?.autocomplete) {
-				return null
+			// Use simple Ollama settings without reading any configs
+			const providerSettings: ProviderSettings = {
+				apiProvider: "ollama",
+				ollamaModelId: "qwen2.5-coder:1.5b", // Changed from apiModelId to ollamaModelId
+				ollamaBaseUrl: "http://localhost:11434",
 			}
 
-			const modelConfig = conf.selectedModelByRole.autocomplete
-
-			// Get the full provider settings from the context proxy
-			let providerSettings: ProviderSettings
-
-			try {
-				// Try to get the provider settings and other state values from the context proxy
-				const contextValues = ContextProxy.instance.getValues()
-				providerSettings = ContextProxy.instance.getProviderSettings()
-
-				// Check if there's an autocomplete configuration available
-				const autocompleteApiConfigId = contextValues.autocompleteApiConfigId
-				const listApiConfigMeta = contextValues.listApiConfigMeta
-
-				console.log("AutocompleteProvider: Checking for autocomplete API config", {
-					autocompleteApiConfigId,
-					listApiConfigMetaLength: listApiConfigMeta?.length || 0,
-				})
-
-				// Try to get autocomplete config first, fall back to current config
-				if (
-					autocompleteApiConfigId &&
-					listApiConfigMeta &&
-					listApiConfigMeta.find(({ id }) => id === autocompleteApiConfigId)
-				) {
-					// Find the autocomplete config in the list
-					const autocompleteConfig = listApiConfigMeta.find(({ id }) => id === autocompleteApiConfigId)
-
-					if (autocompleteConfig && autocompleteConfig.apiProvider) {
-						console.log("AutocompleteProvider: Using autocomplete config for autocomplete:", {
-							name: autocompleteConfig.name,
-							provider: autocompleteConfig.apiProvider,
-						})
-
-						// Use the autocomplete config's provider name if available
-						providerSettings = {
-							...providerSettings,
-							apiProvider: autocompleteConfig.apiProvider,
-						}
-					}
-				} else {
-					console.log("AutocompleteProvider: No specific autocomplete API config found, using default")
-				}
-
-				// Update with the autocomplete-specific settings
-				providerSettings = {
-					...providerSettings,
-					apiProvider: providerSettings.apiProvider || (modelConfig.providerName as any) || "ollama",
-					apiModelId: (modelConfig.model as string) || "qwen2.5-coder:1.5b",
-				}
-
-				// Update the API key if it's provided
-				if (modelConfig.apiKey) {
-					providerSettings.apiKey = modelConfig.apiKey as string
-				}
-			} catch (error) {
-				// If the context proxy is not initialized, fall back to the basic settings
-				console.warn("ContextProxy not initialized, using basic provider settings")
-				providerSettings = {
-					apiProvider: (modelConfig.providerName as any) || "ollama",
-					apiModelId: (modelConfig.model as string) || "qwen2.5-coder:1.5b",
-					apiKey: (modelConfig.apiKey as string) || "",
-				}
-			}
-
-			// Check if Ollama is accessible
-			if (providerSettings.apiProvider === "ollama") {
-				providerSettings.apiModelId = providerSettings.apiModelId?.replace("ollama/", "") || ""
-
-				try {
-					const baseUrl = providerSettings.ollamaBaseUrl || "http://localhost:11434"
-					console.log(`AutocompleteProvider: Checking if Ollama is accessible at ${baseUrl}`)
-
-					// Import the getOllamaModels function
-					const { getOllamaModels } = await import("../../api/providers/ollama")
-
-					// Get available models
-					const models = await getOllamaModels(baseUrl)
-					console.log("AutocompleteProvider: Available Ollama models:", models)
-
-					// Check if the requested model is available
-					const modelId = providerSettings.apiModelId?.replace("ollama/", "") || ""
-					if (!models.includes(modelId)) {
-						console.warn(
-							`AutocompleteProvider: Requested model "${modelId}" not found in available models. Available models: ${models.join(", ")}`,
-						)
-					}
-				} catch (error) {
-					console.error("AutocompleteProvider: Error checking Ollama:", error)
-				}
-			}
-
-			console.log("AutocompleteProvider: Initializing API handler with settings:", {
+			console.log("AutocompleteProvider: Initializing API handler with Ollama settings:", {
 				apiProvider: providerSettings.apiProvider,
-				apiModelId: providerSettings.apiModelId,
-				ollamaBaseUrl: providerSettings.ollamaBaseUrl || "http://localhost:11434",
+				ollamaModelId: providerSettings.ollamaModelId,
+				ollamaBaseUrl: providerSettings.ollamaBaseUrl,
 			})
 
 			const apiHandler = buildApiHandler(providerSettings)
-			return apiHandler
+
+			// Perform a sanity check to verify the API is responsive
+			return this.performApiSanityCheck(apiHandler)
 		} catch (error) {
 			console.error("Error initializing API handler:", error)
 			vscode.window.showErrorMessage(
 				`Failed to initialize autocomplete: ${error instanceof Error ? error.message : String(error)}`,
 			)
+			return null
+		}
+	}
+
+	/**
+	 * Performs a quick sanity check to verify the API handler is working correctly
+	 * @param apiHandler The API handler to check
+	 * @returns The API handler if it's working, or null if there's an issue
+	 */
+	private async performApiSanityCheck(apiHandler: ApiHandler): Promise<ApiHandler | null> {
+		if (!apiHandler) {
+			console.warn("AutocompleteProvider: Cannot perform sanity check - API handler is null")
+			return null
+		}
+
+		try {
+			console.log("AutocompleteProvider: Performing API sanity check...")
+
+			// Check if the model information is available
+			const modelInfo = apiHandler.getModel()
+			if (!modelInfo || !modelInfo.id) {
+				console.error("AutocompleteProvider: API sanity check failed - Model ID is missing")
+				vscode.window.showWarningMessage("Autocomplete API sanity check failed: Model ID is missing")
+				return null
+			}
+
+			console.log("AutocompleteProvider: Using model:", modelInfo.id)
+
+			// Test the createMessage method with a minimal prompt to verify it works
+			// This tests the exact same API functionality that will be used in the actual completion
+			const systemPrompt = "You are a helpful assistant."
+			const userPrompt = "Say hello"
+
+			// Create a message stream to verify it works
+			const stream = apiHandler.createMessage(systemPrompt, [
+				{ role: "user", content: [{ type: "text", text: userPrompt }] },
+			])
+
+			// Just start the stream to verify it works, we don't need to process all chunks
+			const iterator = stream[Symbol.asyncIterator]()
+			await iterator.next()
+
+			// If we get here without errors, the API is responsive and the model is correctly configured
+			console.log(
+				"AutocompleteProvider: API sanity check passed - API is responsive and model is configured correctly",
+			)
+			return apiHandler
+		} catch (error) {
+			console.error("AutocompleteProvider: API sanity check failed:", error)
+
+			// Provide more specific error message for model-related issues
+			let errorMessage = error instanceof Error ? error.message : String(error)
+			if (errorMessage.includes("model is required") || errorMessage.includes("model not found")) {
+				errorMessage = `Model configuration error: ${errorMessage}. Please check your model settings.`
+			}
+
+			vscode.window.showWarningMessage(`Autocomplete API sanity check failed: ${errorMessage}`)
 			return null
 		}
 	}

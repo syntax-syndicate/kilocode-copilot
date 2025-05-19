@@ -57,7 +57,7 @@ export class OllamaHandler extends BaseProvider implements SingleCompletionHandl
 			for await (const chunk of stream) {
 				chunkCount++
 				const delta = chunk.choices[0]?.delta
-				console.log(`OllamaHandler: Received chunk #${chunkCount}:`, delta)
+				// console.log(`OllamaHandler: Received chunk #${chunkCount}:`, delta)
 
 				if (delta?.content) {
 					for (const chunk of matcher.update(delta.content)) {

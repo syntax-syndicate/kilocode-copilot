@@ -20,13 +20,6 @@ export class KiloCodeConfigAdapter {
 					onlyMyCode: config.get<boolean>("autocomplete.onlyMyCode") || true,
 					multilineCompletions: config.get<string>("autocomplete.multilineCompletions") || "auto",
 				},
-				selectedModelByRole: {
-					autocomplete: {
-						model: config.get<string>("autocomplete.model") || "ollama/qwen2.5-coder:1.5b",
-						apiKey: config.get<string>("autocomplete.apiKey") || "",
-						providerName: config.get<string>("autocomplete.providerName") || "ollama",
-					},
-				},
 			},
 		}
 	}

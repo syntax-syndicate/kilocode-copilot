@@ -1189,10 +1189,7 @@ const PromptsView = ({ onDone }: PromptsViewProps) => {
 									// normalise to empty string for empty value
 									// because we can't use it directly for the select element
 									setAutocompleteApiConfigId(value === "-" ? "" : value)
-									vscode.postMessage({
-										type: "autocompleteApiConfigId",
-										text: value,
-									})
+									vscode.postMessage({ type: "autocompleteApiConfigId", text: value })
 								}}>
 								<SelectTrigger data-testid="autocomplete-api-config-select" className="w-full">
 									<SelectValue placeholder={t("kilocode:autocompleteApiConfig.useCurrentConfig")} />
