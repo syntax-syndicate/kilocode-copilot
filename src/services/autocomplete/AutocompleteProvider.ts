@@ -336,8 +336,11 @@ export class AutocompleteProvider {
 
 										// Process text chunks
 										if (chunk.type === "text") {
-											// Append the chunk text to the completion
-											latestCompletion += chunk.text
+											// Clean markdown code blocks from the chunk text
+											const cleanedText = this.cleanMarkdownCodeBlocks(chunk.text)
+
+											// Append the cleaned chunk text to the completion
+											latestCompletion += cleanedText
 
 											// Update the ghost text as chunks arrive
 											const editor = vscode.window.activeTextEditor
@@ -459,6 +462,32 @@ export class AutocompleteProvider {
 	 * Initialize the API handler and return it
 	 * @returns The initialized API handler or null if initialization fails
 	 */
+	/**
+	 * Cleans markdown-style code blocks from text
+	 * Handles both complete and partial code blocks that might appear in streaming responses
+	 * @param text The text to clean
+	 * @returns The cleaned text without markdown code block formatting
+	 */
+	private cleanMarkdownCodeBlocks(text: string): string {
+		// Handle complete code blocks
+		// Replace ```language\n...\n``` with just the content
+		let cleanedText = text.replace(/```[\w-]*\n([\s\S]*?)\n```/g, "$1")
+
+		// Handle opening code block markers at the beginning of a chunk
+		// This handles partial blocks that might start in this chunk
+		cleanedText = cleanedText.replace(/^```[\w-]*\n/g, "")
+
+		// Handle opening code block markers in the middle of a chunk
+		// This handles cases where a new code block starts within this chunk
+		cleanedText = cleanedText.replace(/\n```[\w-]*\n/g, "\n")
+
+		// Handle closing code block markers
+		// This handles partial blocks that might end in this chunk
+		cleanedText = cleanedText.replace(/\n```$/g, "")
+
+		return cleanedText
+	}
+
 	private async initializeApiHandler(): Promise<ApiHandler | null> {
 		// Return existing API handler if it exists
 		if (this.apiHandler) {

@@ -26,52 +26,37 @@ export class OllamaHandler extends BaseProvider implements SingleCompletionHandl
 
 	override async *createMessage(systemPrompt: string, messages: Anthropic.Messages.MessageParam[]): ApiStream {
 		const modelId = this.getModel().id
-		console.log(`OllamaHandler: Creating message with model ${modelId}`)
 		const useR1Format = modelId.toLowerCase().includes("deepseek-r1")
 		const openAiMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [
 			{ role: "system", content: systemPrompt },
 			...(useR1Format ? convertToR1Format(messages) : convertToOpenAiMessages(messages)),
 		]
-		console.log(`OllamaHandler: Prepared messages:`, openAiMessages)
 
-		try {
-			console.log(
-				`OllamaHandler: Calling Ollama API at ${this.options.ollamaBaseUrl || "http://localhost:11434"}/v1 with model: ${this.getModel().id}`,
-			)
-			const stream = await this.client.chat.completions.create({
-				model: this.getModel().id,
-				messages: openAiMessages,
-				temperature: this.options.modelTemperature ?? 0,
-				stream: true,
-			})
-			console.log(`OllamaHandler: Stream created successfully`)
-			const matcher = new XmlMatcher(
-				"think",
-				(chunk) =>
-					({
-						type: chunk.matched ? "reasoning" : "text",
-						text: chunk.data,
-					}) as const,
-			)
-			let chunkCount = 0
-			for await (const chunk of stream) {
-				chunkCount++
-				const delta = chunk.choices[0]?.delta
-				// console.log(`OllamaHandler: Received chunk #${chunkCount}:`, delta)
+		const stream = await this.client.chat.completions.create({
+			model: this.getModel().id,
+			messages: openAiMessages,
+			temperature: this.options.modelTemperature ?? 0,
+			stream: true,
+		})
+		const matcher = new XmlMatcher(
+			"think",
+			(chunk) =>
+				({
+					type: chunk.matched ? "reasoning" : "text",
+					text: chunk.data,
+				}) as const,
+		)
+		for await (const chunk of stream) {
+			const delta = chunk.choices[0]?.delta
 
-				if (delta?.content) {
-					for (const chunk of matcher.update(delta.content)) {
-						yield chunk
-					}
+			if (delta?.content) {
+				for (const chunk of matcher.update(delta.content)) {
+					yield chunk
 				}
 			}
-			console.log(`OllamaHandler: Stream completed with ${chunkCount} chunks`)
-			for (const chunk of matcher.final()) {
-				yield chunk
-			}
-		} catch (error) {
-			console.error(`OllamaHandler: Error in createMessage:`, error)
-			throw error
+		}
+		for (const chunk of matcher.final()) {
+			yield chunk
 		}
 	}
 
