@@ -7,7 +7,6 @@ import { CompletionCache } from "./CompletionCache"
 import { ContextGatherer } from "./ContextGatherer"
 import { PromptRenderer } from "./PromptRenderer"
 import { ContextProxy } from "../../core/config/ContextProxy"
-import { singleCompletionHandler } from "../../utils/single-completion-handler"
 
 /**
  * Provider for autocomplete functionality
@@ -204,17 +203,15 @@ export class AutocompleteProvider {
 						this.debounceTimeout = setTimeout(async () => {
 							try {
 								// Initialize API handler if needed
-								console.log("🚀 ~ AutocompleteProvider ~ this.apiHandler:", this.apiHandler)
+								// Initialize API handler if needed
+								this.apiHandler = await this.initializeApiHandler()
+
 								if (!this.apiHandler) {
-									await this.initializeApiHandler()
-
-									if (!this.apiHandler) {
-										resolve(null)
-										return
-									}
-
-									// No need to initialize completion streamer anymore
+									resolve(null)
+									return
 								}
+
+								// No need to initialize completion streamer anymore
 
 								// Check if we have a cached completion
 								const cursorIndex = document.offsetAt(position)
@@ -300,23 +297,70 @@ export class AutocompleteProvider {
 									completionId,
 								)
 
-								console.log("AutocompleteProvider: Using direct completion instead of streaming")
+								console.log("AutocompleteProvider: Using streaming approach")
 
 								try {
-									// Get the provider settings
-									const providerSettings = ContextProxy.instance.getProviderSettings()
+									// API handler should already be initialized
+									// No need to get provider settings here as it's handled in initializeApiHandler
 
-									// Combine system prompt and prompt for direct completion
-									const combinedPrompt = `${request.systemPrompt}\n\n${request.prompt}`
-									console.log("AutocompleteProvider: Using combined prompt for direct completion")
+									// Create a cancellation flag
+									let isCancelled = false
 
-									// Call the single completion handler directly
-									const completion = await singleCompletionHandler(providerSettings, combinedPrompt)
+									// Store the active completion ID to check for cancellation
+									const currentCompletionId = completionId
 
-									// Update the latest completion
-									latestCompletion = completion
+									// Function to check if the request has been cancelled
+									const checkCancellation = () => {
+										if (this.activeCompletionId !== currentCompletionId) {
+											isCancelled = true
+											console.log("AutocompleteProvider: Completion cancelled, ID mismatch")
+											return true
+										}
+										return false
+									}
 
-									console.log("AutocompleteProvider: Got completion:", {
+									// Initialize an empty completion
+									latestCompletion = ""
+
+									// Create a message stream using the API handler
+									const systemPromptMessage = request.systemPrompt
+									const userMessage = request.prompt
+
+									// Create the stream using the API handler's createMessage method
+									const stream = this.apiHandler.createMessage(systemPromptMessage, [
+										{ role: "user", content: [{ type: "text", text: userMessage }] },
+									])
+
+									console.log("AutocompleteProvider: Started streaming completion")
+
+									// Process the stream
+									for await (const chunk of stream) {
+										// Check for cancellation before processing each chunk
+										if (checkCancellation()) {
+											break
+										}
+
+										// Process text chunks
+										if (chunk.type === "text") {
+											// Append the chunk text to the completion
+											latestCompletion += chunk.text
+
+											// Update the ghost text as chunks arrive
+											const editor = vscode.window.activeTextEditor
+											if (editor && editor.document === document) {
+												this.updateGhostText(editor, latestCompletion)
+											}
+										}
+									}
+
+									// If cancelled, don't proceed with the completion
+									if (isCancelled) {
+										console.log("AutocompleteProvider: Completion was cancelled")
+										resolve(null)
+										return
+									}
+
+									console.log("AutocompleteProvider: Completed streaming:", {
 										completionLength: latestCompletion.length,
 										completion:
 											latestCompletion.substring(0, 100) +
@@ -419,14 +463,19 @@ export class AutocompleteProvider {
 	}
 
 	/**
-	 * Initialize the API handler
+	 * Initialize the API handler and return it
+	 * @returns The initialized API handler or null if initialization fails
 	 */
-	private async initializeApiHandler(): Promise<void> {
+	private async initializeApiHandler(): Promise<ApiHandler | null> {
+		// Return existing API handler if it exists
+		if (this.apiHandler) {
+			return this.apiHandler
+		}
 		try {
 			const { config: conf } = await this.config.loadConfig()
 
 			if (!conf?.selectedModelByRole?.autocomplete) {
-				return
+				return null
 			}
 
 			const modelConfig = conf.selectedModelByRole.autocomplete
@@ -527,12 +576,14 @@ export class AutocompleteProvider {
 				ollamaBaseUrl: providerSettings.ollamaBaseUrl || "http://localhost:11434",
 			})
 
-			this.apiHandler = buildApiHandler(providerSettings)
+			const apiHandler = buildApiHandler(providerSettings)
+			return apiHandler
 		} catch (error) {
 			console.error("Error initializing API handler:", error)
 			vscode.window.showErrorMessage(
 				`Failed to initialize autocomplete: ${error instanceof Error ? error.message : String(error)}`,
 			)
+			return null
 		}
 	}
 
